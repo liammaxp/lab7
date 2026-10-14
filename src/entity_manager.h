@@ -31,9 +31,8 @@ public:
       return id;
     }
     EntityID id = activeEntities.size();
-    std::array<size_t, sizeof...(ComponentTypes)> indices;
-    indices.fill(INVALID_INDEX);
-    componentIndices.push_back(indices);
+    componentIndices.emplace_back();
+    componentIndices.back().fill(INVALID_INDEX);
     activeEntities.push_back(true);
     return id;
   }
@@ -42,7 +41,7 @@ public:
   }
   template <typename ComponentType>
   bool hasComponent(EntityID id) const {
-    static_assert(Pack<ComponentTypes...>::template contains<ComponentType>,"Invalid component type");
+    static_assert(Pack<ComponentTypes...>::template contains<ComponentType>, "Invalid component type");
     assert(validEntity(id));
     constexpr int typeIndex = Pack<ComponentTypes...>::template index<ComponentType>;
     return componentIndices[id][typeIndex] != INVALID_INDEX;
@@ -55,15 +54,22 @@ public:
     size_t index = componentIndices[id][typeIndex];
     return std::get<typeIndex>(registries)[index];
   }
-
+  template <typename ComponentType>
+  const ComponentType& getComponent(EntityID id) const {
+    static_assert(Pack<ComponentTypes...>::template contains<ComponentType>, "Invalid component type");
+    assert(hasComponent<ComponentType>(id));
+    constexpr int typeIndex = Pack<ComponentTypes...>::template index<ComponentType>;
+    size_t index = componentIndices[id][typeIndex];
+    return std::get<Registry<ComponentType>>(registries)[index];
+  }
   template <typename ComponentType>
   void addComponent(EntityID id, ComponentType&& component) {
     using T = std::remove_cvref_t<ComponentType>;
-    static_assert(Pack<ComponentTypes...>::template contains<T>,"Invalid component type");
+    static_assert(Pack<ComponentTypes...>::template contains<T>, "Invalid component type");
     assert(validEntity(id));
     assert(!hasComponent<T>(id));
     constexpr int typeIndex = Pack<ComponentTypes...>::template index<T>;
-    size_t index = std::get<typeIndex>(registries).store(std::forward<ComponentType>(component));
+    size_t index = std::get<Registry<T>>(registries).store(std::forward<ComponentType>(component));
     componentIndices[id][typeIndex] = index;
   }
 };
